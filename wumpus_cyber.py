@@ -10,14 +10,50 @@ import random
 import matplotlib.pyplot as plt
 from scipy.stats import entropy
 
+SEED = 1
 
+seeds = [
+    {
+        'name': 'default',
+        'size': 4,
+        'pits': [(1, 1), (3, 1)],
+        'wumpus_pos': (3, 3),
+        'gold_pos': (2, 2),
+        'agent_pos': (0, 0)
+    },
+    {
+        'name': 'corners',
+        'size': 4,
+        'pits': [(0, 3), (3, 0)],
+        'wumpus_pos': (3, 3),
+        'gold_pos': (1, 1),
+        'agent_pos': (0, 0)
+    },
+    {
+        'name': 'clustered',
+        'size': 4,
+        'pits': [(1, 1), (1, 2)],
+        'wumpus_pos': (1, 3),
+        'gold_pos': (1, 0),
+        'agent_pos': (0, 0)
+    },
+    {
+        'name': 'random6x6',
+        'size': 6,
+        'pits': [(2, 5), (5, 1), (1, 4)],
+        'wumpus_pos': (4, 3),
+        'gold_pos': (0, 5),
+        'agent_pos': (0, 0)
+    }
+]
 
 class WumpusCyberEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, size=6, mode='static'):
+    def __init__(self, seed_config=None, mode='static'):
         super().__init__()
-        self.size = size
+        self.seed_config = seed_config or {}
+        self.size = seed_config.get('size', 4)
         self.mode = mode
 
         # Espacio de acciones: [↑, →, ↓, ←, Disparar, Agarrar]
@@ -25,7 +61,7 @@ class WumpusCyberEnv(gym.Env):
 
         # Espacio de observación
         self.observation_space = spaces.Dict({
-            'position': spaces.Box(0, size - 1, (2,), int),
+            'position': spaces.Box(0, self.size - 1, (2,), int),
             'percepts': spaces.MultiBinary(3),  # [Brisa, Hedor, Brillo]
             'orientation': spaces.Discrete(4),
             'chaos': spaces.Box(0, 1, (2,))  # [Entropía, Lyapunov]
@@ -36,16 +72,16 @@ class WumpusCyberEnv(gym.Env):
 
         # Configuración PyGame
         pygame.init()
-        self.screen = pygame.display.set_mode((size * 100, size * 100))
+        self.screen = pygame.display.set_mode((self.size * 100, self.size * 100))
         self.font = pygame.font.SysFont('Arial', 24)
 
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
         # Configurar posiciones estáticas
-        self.agent_pos = np.array([0, 0])
-        self.wumpus_pos = (3, 3) if self.mode == 'static' else None
-        self.gold_pos = np.array([2, 2])  #! Definir como array
-        self.pits = [(1, 1), (3, 1)]
+        self.agent_pos = np.array(self.seed_config.get('agent_pos', (0, 0)))
+        self.wumpus_pos = self.seed_config.get('wumpus_pos',(2,3))
+        self.gold_pos = np.array(self.seed_config.get('gold_pos', (2, 2))) #! Definir como array
+        self.pits = self.seed_config.get('pits', [])
 
         # Estado interno
         self.orientation = 0
@@ -62,6 +98,31 @@ class WumpusCyberEnv(gym.Env):
             'orientation': self.orientation,
             'chaos': self.chaos_params
         }
+
+    def _move_wumpus(self):
+        if self.wumpus_pos is None:
+            return  # Ya fue eliminado
+
+        x, y = self.wumpus_pos
+        directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
+        random.shuffle(directions)  # Para que el movimiento sea aleatorio
+
+        for dx, dy in directions:
+            new_pos = (x + dx, y + dy)
+
+            # Verificar que no se salga del mapa
+            if not (0 <= new_pos[0] < self.size and 0 <= new_pos[1] < self.size):
+                continue
+
+            # Verificar que no toque el oro, los pozos ni al agente
+            if (tuple(new_pos) in self.pits or
+                np.array_equal(new_pos, self.gold_pos) or
+                np.array_equal(new_pos, self.agent_pos)):
+                continue
+
+            # Mover al Wumpus
+            self.wumpus_pos = new_pos
+            break  # Solo un movimiento por turno
 
     def _get_percepts(self):
         x, y = self.agent_pos
@@ -94,6 +155,10 @@ class WumpusCyberEnv(gym.Env):
             reward += self._shoot()
         elif action == 5:
             reward += self._grab_gold()
+        
+        if self.mode != "static":
+            self._move_wumpus()
+        
 
         # Recoger oro automáticamente si está en la casilla
         if np.array_equal(self.agent_pos, self.gold_pos) and not self.has_gold:
@@ -112,10 +177,10 @@ class WumpusCyberEnv(gym.Env):
             reward -= 1000
             done = True
             print("¡El Wumpus te atrapó! 🐉")
-        elif self.has_gold and np.array_equal(self.agent_pos, [0, 0]):
+        elif self.has_gold and np.array_equal(self.agent_pos, [0, 0]) and self.wumpus_pos is None:
             reward += 2000
             done = True
-            print("¡Victoria! 🏆")
+            print("¡Victoria con Wumpus eliminado! 🏆")
 
         return self._get_obs(), reward, done, info
 
@@ -175,6 +240,31 @@ class WumpusCyberEnv(gym.Env):
         self._draw_element(self.gold_pos, (255, 215, 0), 'G')
         for pit in self.pits:
             self._draw_element(pit, (0, 0, 255), 'P')
+
+        # Dibujar perceptos (brisa y hedor)
+        # Brisa: casillas adyacentes a pozos
+        breeze_color = (42, 46, 59)  # celeste claro semi-transparente
+        for pit in self.pits:
+            adj = [(pit[0] + 1, pit[1]), (pit[0] - 1, pit[1]), (pit[0], pit[1] + 1), (pit[0], pit[1] - 1)]
+            for pos in adj:
+                if 0 <= pos[0] < self.size and 0 <= pos[1] < self.size:
+                    rect = pygame.Rect(pos[0] * 100, pos[1] * 100, 100, 100)
+                    # Para transparencia hay que usar Surface aparte
+                    s = pygame.Surface((100, 100), pygame.SRCALPHA)  
+                    s.fill(breeze_color)  
+                    self.screen.blit(s, rect.topleft)
+
+        # Hedor: casillas adyacentes al Wumpus
+        if self.wumpus_pos:
+            stench_color = (59, 42, 42)  # naranja claro semi-transparente
+            wx, wy = self.wumpus_pos
+            adj = [(wx + 1, wy), (wx - 1, wy), (wx, wy + 1), (wx, wy - 1)]
+            for pos in adj:
+                if 0 <= pos[0] < self.size and 0 <= pos[1] < self.size:
+                    rect = pygame.Rect(pos[0] * 100, pos[1] * 100, 100, 100)
+                    s = pygame.Surface((100, 100), pygame.SRCALPHA)
+                    s.fill(stench_color)
+                    self.screen.blit(s, rect.topleft)
 
         # Dibujar agente
         x, y = self.agent_pos
@@ -303,7 +393,7 @@ class CyberneticAgent:
 
 
 def train():
-    env = WumpusCyberEnv(mode='static')
+    env = WumpusCyberEnv(seed_config=seeds[SEED], mode='static')
     agent = CyberneticAgent(env, use_dqn=True)
 
     # Configurar pygame para actualizaciones más lentas
@@ -333,7 +423,7 @@ def train():
                     return
 
             env.render()
-            clock.tick(400)  # ! 20 FPS máximo
+            clock.tick(4000)  # ! 20 FPS máximo
 
             # Obtener acción y ejecutar
             accion = agent.act(estado)
