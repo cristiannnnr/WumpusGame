@@ -1,10 +1,10 @@
-import gym
+import gymnasium as gym
+from gymnasium import spaces
 import pygame
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from gym import spaces
 from collections import deque
 import random
 import matplotlib.pyplot as plt
@@ -15,7 +15,7 @@ from scipy.stats import entropy
 class WumpusCyberEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, size=4, mode='static'):
+    def __init__(self, size=6, mode='static'):
         super().__init__()
         self.size = size
         self.mode = mode
@@ -39,7 +39,8 @@ class WumpusCyberEnv(gym.Env):
         self.screen = pygame.display.set_mode((size * 100, size * 100))
         self.font = pygame.font.SysFont('Arial', 24)
 
-    def reset(self):
+    def reset(self, *, seed=None, options=None):
+        super().reset(seed=seed)
         # Configurar posiciones estáticas
         self.agent_pos = np.array([0, 0])
         self.wumpus_pos = (3, 3) if self.mode == 'static' else None
@@ -52,7 +53,7 @@ class WumpusCyberEnv(gym.Env):
         self.has_gold = False
         self.chaos_params = np.zeros(2)
 
-        return self._get_obs()
+        return self._get_obs(), {} 
 
     def _get_obs(self):
         return {
@@ -240,12 +241,20 @@ class CyberneticAgent:
             return np.argmax(self.q_table[state_idx])
 
     def _state_to_tensor(self, state):
-        return torch.FloatTensor([
-            *state['position'],  # 2 elementos
-            *state['percepts'],  # 3 elementos
-            state['orientation'],  # 1 elemento (no one-hot)
-            *state['chaos']  # 2 elementos
-        ])  # Total: 2+3+1+2 = 8 elementos
+        # Si es una tupla como (dict, dict), toma solo el primero
+        if isinstance(state, tuple):
+            state = state[0]
+
+        position = state['position']           # np.array de 2 elementos
+        percepts = state['percepts']           # np.array de 3 elementos
+        orientation = np.array([state['orientation']])  # convertir a array para poder concatenar
+        chaos = state['chaos']                 # np.array de 2 elementos
+
+        # Concatenar todo en un solo array
+        all_data = np.concatenate([position, percepts, orientation, chaos])
+        
+        # Convertir a tensor de tipo float
+        return torch.FloatTensor(all_data)
 
     def _state_to_index(self, state):
         return hash((
@@ -324,10 +333,11 @@ def train():
                     return
 
             env.render()
-            clock.tick(20)  # ! 20 FPS máximo
+            clock.tick(400)  # ! 20 FPS máximo
 
             # Obtener acción y ejecutar
             accion = agent.act(estado)
+            
             prox_estado, recompensa, done, info = env.step(accion)
 
             # ! Debug por cada acción
