@@ -10,14 +10,51 @@ import random
 import matplotlib.pyplot as plt
 from scipy.stats import entropy
 
+SEED = 0
+
+seeds = [
+    {
+        'name': 'default',
+        'size': 4,
+        'pits': [(1, 1), (3, 1)],
+        'wumpus_pos': (3, 3),
+        'gold_pos': (2, 2),
+        'agent_pos': (0, 0)
+    },
+    {
+        'name': 'corners',
+        'size': 4,
+        'pits': [(0, 3), (3, 0)],
+        'wumpus_pos': (3, 3),
+        'gold_pos': (1, 1),
+        'agent_pos': (0, 0)
+    },
+    {
+        'name': 'clustered',
+        'size': 4,
+        'pits': [(1, 1), (1, 2)],
+        'wumpus_pos': (1, 3),
+        'gold_pos': (1, 0),
+        'agent_pos': (0, 0)
+    },
+    {
+        'name': 'random6x6',
+        'size': 6,
+        'pits': [(2, 5), (5, 1), (1, 4)],
+        'wumpus_pos': (4, 3),
+        'gold_pos': (0, 5),
+        'agent_pos': (0, 0)
+    }
+]
 
 
 class WumpusCyberEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, size=6, mode='static'):
+    def __init__(self, seed_config=None, mode='static'):
         super().__init__()
-        self.size = size
+        self.seed_config = seed_config or {}
+        self.size = self.seed_config.get('size', 4)
         self.mode = mode
 
         # Espacio de acciones: [↑, →, ↓, ←, Disparar, Agarrar]
@@ -25,7 +62,7 @@ class WumpusCyberEnv(gym.Env):
 
         # Espacio de observación
         self.observation_space = spaces.Dict({
-            'position': spaces.Box(0, size - 1, (2,), int),
+            'position': spaces.Box(0, self.size - 1, (2,), int),
             'percepts': spaces.MultiBinary(3),  # [Brisa, Hedor, Brillo]
             'orientation': spaces.Discrete(4),
             'chaos': spaces.Box(0, 1, (2,))  # [Entropía, Lyapunov]
@@ -36,16 +73,17 @@ class WumpusCyberEnv(gym.Env):
 
         # Configuración PyGame
         pygame.init()
-        self.screen = pygame.display.set_mode((size * 100, size * 100))
+        self.screen = pygame.display.set_mode((self.size * 100, self.size * 100))
+        pygame.display.set_caption("Wumpus World Adaptive Agent")
         self.font = pygame.font.SysFont('Arial', 24)
 
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
         # Configurar posiciones estáticas
-        self.agent_pos = np.array([0, 0])
-        self.wumpus_pos = (3, 3) if self.mode == 'static' else None
-        self.gold_pos = np.array([2, 2])  #! Definir como array
-        self.pits = [(1, 1), (3, 1)]
+        self.agent_pos = np.array(self.seed_config.get('agent_pos', (0, 0)))  # Posición del agente
+        self.wumpus_pos = self.seed_config.get('wumpus_pos',(1,1)) if self.mode == 'static' else None
+        self.gold_pos = np.array(self.seed_config.get('gold_pos', (2, 2)))  #! Definir como array
+        self.pits = self.seed_config.get('pits', [(3, 3), (1, 2)])  # Lista de pozos
 
         # Estado interno
         self.orientation = 0
@@ -169,6 +207,30 @@ class WumpusCyberEnv(gym.Env):
             for y in range(self.size):
                 rect = pygame.Rect(x * 100, y * 100, 100, 100)
                 pygame.draw.rect(self.screen, (100, 100, 100), rect, 1)
+
+        # Brisa: casillas adyacentes a pozos
+        breeze_color = (42, 46, 59)  # celeste claro semi-transparente
+        for pit in self.pits:
+            adj = [(pit[0] + 1, pit[1]), (pit[0] - 1, pit[1]), (pit[0], pit[1] + 1), (pit[0], pit[1] - 1)]
+            for pos in adj:
+                if 0 <= pos[0] < self.size and 0 <= pos[1] < self.size:
+                    rect = pygame.Rect(pos[0] * 100, pos[1] * 100, 100, 100)
+                    # Para transparencia hay que usar Surface aparte
+                    s = pygame.Surface((100, 100), pygame.SRCALPHA)  
+                    s.fill(breeze_color)  
+                    self.screen.blit(s, rect.topleft)
+
+        # Hedor: casillas adyacentes al Wumpus
+        if self.wumpus_pos:
+            stench_color = (59, 42, 42)  # naranja claro semi-transparente
+            wx, wy = self.wumpus_pos
+            adj = [(wx + 1, wy), (wx - 1, wy), (wx, wy + 1), (wx, wy - 1)]
+            for pos in adj:
+                if 0 <= pos[0] < self.size and 0 <= pos[1] < self.size:
+                    rect = pygame.Rect(pos[0] * 100, pos[1] * 100, 100, 100)
+                    s = pygame.Surface((100, 100), pygame.SRCALPHA)
+                    s.fill(stench_color)
+                    self.screen.blit(s, rect.topleft)
 
         # Dibujar elementos
         self._draw_element(self.wumpus_pos, (255, 0, 0), 'W')
@@ -303,7 +365,7 @@ class CyberneticAgent:
 
 
 def train():
-    env = WumpusCyberEnv(mode='static')
+    env = WumpusCyberEnv(seed_config=seeds[SEED], mode='static')
     agent = CyberneticAgent(env, use_dqn=True)
 
     # Configurar pygame para actualizaciones más lentas
@@ -311,11 +373,12 @@ def train():
 
     # Estadísticas avanzadas
     recompensas = []
+    prom_recompensas = []
+    prom_prctj_victorias = []
     victorias = []
-    ventana = 50
-    total_episodios = 1000
+    ventana = 5
+    total_episodios = 100
 
-    plt.ion()  # Gráficos interactivos
 
     for episodio in range(total_episodios):
         estado = env.reset()
@@ -333,7 +396,7 @@ def train():
                     return
 
             env.render()
-            clock.tick(400)  # ! 20 FPS máximo
+            clock.tick(4000)  # ! 20 FPS máximo
 
             # Obtener acción y ejecutar
             accion = agent.act(estado)
@@ -360,13 +423,39 @@ def train():
             avg_recompensa = np.mean(recompensas[-ventana:])
             tasa_victorias = np.mean(victorias[-ventana:]) * 100
 
+            prom_recompensas.append(avg_recompensa)
+            prom_prctj_victorias.append(tasa_victorias)
+
             print(f"\n[Resumen Episodio {episodio}]")
             print(f"Recompensa Promedio: {avg_recompensa:.1f}")
             print(f"Tasa de Victorias: {tasa_victorias:.1f}%")
             print(f"Exploración: {agent.epsilon:.2f}")
 
     env.close()
+    return prom_recompensas, prom_prctj_victorias
 
 
 if __name__ == "__main__":
-    train()
+    prom_recompensas, prom_prctj_victorias = train()
+    # --- Average Reward (last 50 episodes) ---
+    plt.plot(prom_recompensas, label='Average Reward', color='green')
+
+    plt.xlabel('Episodes')
+    plt.ylabel('Value')
+    plt.title('Average Reward Every 5 Episodes')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    # --- Win Rate with Fixed Scale (0–100%) ---
+    plt.figure(figsize=(10, 4))
+    plt.plot(prom_prctj_victorias, color='royalblue', label='Win Rate (%)')
+    plt.ylim(0, 100)  # Force Y-axis scale from 0 to 100
+    plt.xlabel('Episodes')
+    plt.ylabel('Win Rate (%)')
+    plt.title('Win Rate Every 5 Episodes')
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
