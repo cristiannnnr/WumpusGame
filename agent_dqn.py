@@ -9,7 +9,7 @@ import random
 
 class CyberneticAgent:
     def __init__(self, env, use_dqn=True):
-        print("✅ Cargando versión correcta de CyberneticAgent")
+        print("Cargando versión correcta de CyberneticAgent")
         self.env = env
         self.use_dqn = use_dqn
     
