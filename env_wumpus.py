@@ -112,7 +112,7 @@ class WumpusCyberEnv(gym.Env):
 
         if (tuple(self.agent_pos) == tuple(self.gold_pos)) and not self.has_gold:
             reward += self._grab_gold()
-            print("💰 Oro recogido automáticamente.")
+            print("Oro recogido automáticamente.")
 
         self._update_chaos(action)
 
@@ -129,7 +129,7 @@ class WumpusCyberEnv(gym.Env):
             reward += 2000
             done = True
             info['event'] = 'success'
-            print("🏆 ¡Victoria! Regresaste con el oro.")
+            print("¡Victoria! Regresaste con el oro.")
 
         obs = self._get_obs()
         return obs, reward, done, info
