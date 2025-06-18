@@ -43,7 +43,7 @@ def evaluate_scenario(scenario, episodes_per_seed=200, seeds=[0, 1, 2], render=F
     rewards_all, successes_all, lyapunovs_all = [], [], []
 
     for seed in seeds:
-        print(f"\n🌱 Seed: {seed} — Scenario: {scenario}")
+        print(f"\n Seed: {seed} — Scenario: {scenario}")
         env = WumpusCyberEnv(mode=scenario, size=size, seed=seed)
         agent = CyberneticAgent(env)
         clock = pygame.time.Clock() if render else None
@@ -130,8 +130,8 @@ def main():
     parser.add_argument("--size", type=int, default=4)
     args = parser.parse_args()
 
-    print("✅ Running train.py")
-    print("🚀 Starting training...")
+    print("Running train.py")
+    print("Starting training...")
 
     avg_rewards, avg_successes, avg_lyapunovs = evaluate_scenario(
         scenario=args.scenario,
