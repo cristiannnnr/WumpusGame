@@ -4,7 +4,7 @@ from metrics import plot_metrics
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scenario", default="static", choices=["static", "random", "custom"])
+    parser.add_argument("--scenario", default="static", choices=["static", "random", "custom", "dynamic"])
     parser.add_argument("--episodes", type=int, default=100)
     parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2])
     parser.add_argument("--render", action="store_true")

@@ -63,7 +63,7 @@ class WumpusCyberEnv(gym.Env):
         self.gold_visible = True
         self.wumpus_alive = True
 
-        if self.mode == 'static':
+        if self.mode == 'static' or self.mode == 'dynamic':
             self.wumpus_pos = (self.size - 1, self.size - 1)
             self.gold_pos = (self.size - 2, self.size - 2)
             self.pits = [(1, 1), (self.size - 1, 1)]
@@ -132,6 +132,14 @@ class WumpusCyberEnv(gym.Env):
             done = True
             info['event'] = 'success'
             print("¡Victoria! Regresaste con el oro.")
+
+        if self.mode == 'dynamic' and self.wumpus_alive:
+            empty_cells = [
+                (i, j) for i in range(self.size)
+                for j in range(self.size)
+                if (i, j) != tuple(self.agent_pos) and (i, j) not in self.pits and (i, j) != tuple(self.gold_pos)
+            ]
+            self.wumpus_pos = random.choice(empty_cells)
 
         obs = self._get_obs()
         return obs, reward, done, info

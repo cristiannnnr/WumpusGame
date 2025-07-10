@@ -35,6 +35,9 @@ def run_episode(env, agent, render=False, clock=None, max_steps=100, delay=0.0):
         steps += 1
 
     success = info.get("event") == "success"
+
+    if not success:
+        print(f"💀 El agente murió por: {info.get('event', 'máximo de pasos')}")
     return total_reward, steps, success, lyapunov_list, False
 
 def evaluate_scenario(scenario, episodes_per_seed=200, seeds=[0, 1, 2], render=False, size=4, delay=0.0, max_steps=100, save_model=False, load_model=False, model_path="model.pt"):
@@ -44,7 +47,7 @@ def evaluate_scenario(scenario, episodes_per_seed=200, seeds=[0, 1, 2], render=F
     best_agent = None
     best_avg_reward = float('-inf')
 
-    for seed in seeds:
+    for seed in seeds:        
         print(f"\n Seed: {seed} — Scenario: {scenario}")
         env = WumpusCyberEnv(mode=scenario, size=size, seed=seed)
         agent = CyberneticAgent(env)
