@@ -2,12 +2,12 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-def plot_metrics(avg_rewards, avg_successes, avg_lyapunovs, avg_steps, scenario):
+def plot_metrics(avg_rewards, avg_successes, avg_lyapunovs, avg_steps, avg_losses, scenario):
     if not os.path.exists("plots"):
         os.makedirs("plots")
 
-    fig, axs = plt.subplots(4, 1, figsize=(12, 12), sharex=True)
-    fig.suptitle(f"Training Metrics — {scenario.title()} Scenario", fontsize=16)
+    fig, axs = plt.subplots(5, 1, figsize=(7, 9), sharex=True)
+    fig.suptitle(f"Training Metrics — {scenario.title()} Scenario (All seeds)", fontsize=16)
 
     axs[0].plot(avg_rewards, color="blue", linewidth=2)
     axs[0].set_ylabel("Avg. Reward")
@@ -28,8 +28,13 @@ def plot_metrics(avg_rewards, avg_successes, avg_lyapunovs, avg_steps, scenario)
 
     axs[3].plot(avg_steps, color="purple", linewidth=2)
     axs[3].set_ylabel("Avg. Steps")
-    axs[3].set_xlabel("Episode")
     axs[3].grid(True)
+
+    axs[4].plot(avg_losses, color="orange", linewidth=2)
+    axs[4].set_ylabel("Avg. Loss")
+    axs[4].set_xlabel("Episode")
+    axs[4].grid(True)
+
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 

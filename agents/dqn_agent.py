@@ -71,7 +71,7 @@ class CyberneticAgent:
     def update(self, state, action, reward, next_state, done):
         if self.use_dqn:
             self.memory.append((state, action, reward, next_state, done))
-            self._replay()
+            loss = self._replay()
 
             if done:
                 self.episode_count += 1
@@ -84,10 +84,11 @@ class CyberneticAgent:
             self.q_table[s_idx, action] += 0.1 * (target - self.q_table[s_idx, action])
 
         self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
+        return loss if self.use_dqn else 0
 
     def _replay(self):
         if len(self.memory) < 512:
-            return
+            return 0
 
         batch = random.sample(self.memory, 512)
         states, actions, rewards, next_states, dones = zip(*batch)
@@ -103,6 +104,7 @@ class CyberneticAgent:
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+        return loss.item()
 
     def save(self, path="model.pt"):
         if self.use_dqn:

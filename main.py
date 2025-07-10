@@ -19,7 +19,7 @@ def main():
     print("Running main.py")
     print("Starting training...")
 
-    avg_rewards, avg_successes, avg_lyapunovs, avg_steps = evaluate_scenario(
+    avg_rewards, avg_successes, avg_lyapunovs, avg_steps, avg_losses = evaluate_scenario(
         scenario=args.scenario,
         episodes_per_seed=args.episodes,
         seeds=args.seeds,
@@ -32,7 +32,7 @@ def main():
         model_path=args.model_path
     )
 
-    plot_metrics(avg_rewards, avg_successes, avg_lyapunovs, avg_steps, args.scenario)
+    plot_metrics(avg_rewards, avg_successes, avg_lyapunovs, avg_steps, avg_losses, args.scenario)
 
 if __name__ == "__main__":
     main()
