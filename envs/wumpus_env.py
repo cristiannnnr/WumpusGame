@@ -5,6 +5,7 @@ import os
 from gym import spaces
 from scipy.stats import entropy as scipy_entropy
 import random
+import math
 
 class WumpusCyberEnv(gym.Env):
     metadata = {'render.modes': ['human']}
@@ -70,9 +71,13 @@ class WumpusCyberEnv(gym.Env):
         elif self.mode == 'random':
             cells = [(i, j) for i in range(self.size) for j in range(self.size) if not (i == 0 and j == 0)]
             self.np_random.shuffle(cells)
+            
             self.wumpus_pos = cells[0]
             self.gold_pos = cells[1]
-            self.pits = cells[2:4]
+
+            num_pits = max(2, round(self.size * self.size * 0.15))
+            pits_candidates = [c for c in cells[2:] if c != self.wumpus_pos and c != self.gold_pos]
+            self.pits = pits_candidates[:num_pits]
         else:
             self.wumpus_pos = self.custom_wumpus if self.custom_wumpus else (self.size - 1, self.size - 1)
             self.gold_pos = self.custom_gold if self.custom_gold else (self.size - 2, self.size - 2)
@@ -131,7 +136,7 @@ class WumpusCyberEnv(gym.Env):
             reward += 2000
             done = True
             info['event'] = 'success'
-            print("¡Victoria! Regresaste con el oro.")
+            print("🏆 Victoria")
 
         if self.mode == 'dynamic' and self.wumpus_alive:
             empty_cells = [
