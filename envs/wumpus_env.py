@@ -114,7 +114,7 @@ class WumpusCyberEnv(gym.Env):
 
         if (tuple(self.agent_pos) == tuple(self.gold_pos)) and not self.has_gold:
             reward += self._grab_gold()
-            print("Oro recogido automáticamente.")
+            print("🥇 Oro recogido")
 
         self._update_chaos(action)
 
@@ -174,7 +174,7 @@ class WumpusCyberEnv(gym.Env):
             traj = [(x0 - i, y0) for i in range(1, self.size)]
         if self.wumpus_pos in traj:
             self.wumpus_alive = False
-            print("¡Has derrotado al Wumpus!")
+            print("🎯 Wumpus abatido")
             return 500
         return -50
 
